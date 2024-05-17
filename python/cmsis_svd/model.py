@@ -17,7 +17,7 @@ import json
 import six
 
 
-def _check_type(value, expected_type):
+def _check_type(value, expected_type, allow_none = False):
     """Perform type checking on the provided value
 
     This is a helper that will raise ``TypeError`` if the provided value is
@@ -27,6 +27,9 @@ def _check_type(value, expected_type):
 
     If the value passed the type check it will be returned from the call.
     """
+    if value == None and allow_none:
+        return value
+
     if not isinstance(value, expected_type):
         raise TypeError("Value {value!r} has unexpected type {actual_type!r}, expected {expected_type!r}".format(
             value=value,
@@ -74,6 +77,9 @@ class SVDElement(object):
         encoder = SVDJSONEncoder()
         return json.loads(encoder.encode(self))
 
+    # conversion to string
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.to_dict()})"
 
 class SVDEnumeratedValue(SVDElement):
     def __init__(self, name, description, value, is_default):
@@ -143,13 +149,17 @@ class SVDRegisterArray(SVDElement):
 
     @property
     def registers(self):
+
+        def _extend_index(name, index):
+            if name and '%s' in name:
+                return name % index
+            return name
+
         for i in six.moves.range(self.dim):
-            display_name = self.display_name
-            if self.display_name and '%s' in self.display_name:
-                display_name = self.display_name % self.dim_indices[i]
+            display_name = _extend_index(self.display_name, self.dim_indices[i])
 
             reg = SVDRegister(
-                name=self.name % self.dim_indices[i],
+                name = _extend_index(self.name, self.dim_indices[i]),
                 fields=self.fields,
                 derived_from=self.derived_from,
                 description=self.description,
@@ -435,8 +445,8 @@ class SVDDevice(SVDElement):
         self.version = version
         self.description = description
         self.cpu = cpu
-        self.address_unit_bits = _check_type(address_unit_bits, six.integer_types)
-        self.width = _check_type(width, six.integer_types)
+        self.address_unit_bits = _check_type(address_unit_bits, six.integer_types, allow_none=True)
+        self.width = _check_type(width, six.integer_types, allow_none=True)
         self.peripherals = peripherals if peripherals else list()
         self.size = size  # Defines the default bit-width of any register contained in the device (implicit inheritance).
         self.access = access  # Defines the default access rights for all registers.
